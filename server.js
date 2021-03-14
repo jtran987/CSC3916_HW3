@@ -12,6 +12,7 @@ var authJwtController = require('./auth_jwt');
 var jwt = require('jsonwebtoken');
 var cors = require('cors');
 var User = require('./Users');
+var Movies =require('./Movies');
 
 var app = express();
 app.use(cors());
@@ -84,6 +85,55 @@ router.post('/signin', function (req, res) {
         })
     })
 });
+
+router.route('/movies')
+    .delete(authJwtController.isAuthenticated, function(req,res){
+        if(!req.body.title){
+            res.json({success: false, message: "Error. No movie was found"});
+        }else{
+            Movies.findOneAndDelete(req.body.title, function(err,movie){
+                if (err) {
+                    res.send(err);
+                }
+            });
+        }
+    })
+
+    .put(authJwtController.isAuthenticated, function(req,res){
+        if(!req.body.title || !req.body.newtitle){
+            res.json({success: false, message: "Error. No movie title was found"});
+        }else{
+            Movies.findOneAndUpdate(req.body.title, function(err,movie){
+                if (err) {
+                    res.send(err);
+                }
+            });
+        }
+    })
+
+    .post(authJwtController.isAuthenticated, function(req,res){
+        if(!req.body.title || !req.body.year || !req.body.genre ||req.body.actor){
+            res.json({success: false, message: "Error. No movie title was found"});
+        }else{
+            Movies.post(req.body.title, function(err,movie){
+                if (err) {
+                    res.send(err);
+                }
+            });
+        }
+    })
+
+    .get(authJwtController.isAuthenticated, function(req,res){
+        if(!req.body){
+            res.json({success: false, message: "Error. No movie title was found"});
+        }else{
+            Movies.find(req.body.title, function(err,movies){
+                if (err) {
+                    res.send(err);
+                }
+            });
+        }
+    })
 
 app.use('/', router);
 app.listen(process.env.PORT || 8080);
