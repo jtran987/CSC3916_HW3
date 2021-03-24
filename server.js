@@ -1,5 +1,5 @@
 /*
-CSC3916 HW2
+CSC3916 HW3
 File: Server.js
 Description: Web API scaffolding for Movie API
  */
@@ -7,12 +7,11 @@ Description: Web API scaffolding for Movie API
 var express = require('express');
 var bodyParser = require('body-parser');
 var passport = require('passport');
-var authController = require('./auth');
 var authJwtController = require('./auth_jwt');
 var jwt = require('jsonwebtoken');
 var cors = require('cors');
 var User = require('./Users');
-var Movies =require('./Movies');
+var Movie =require('./Movies');
 
 var app = express();
 app.use(cors());
@@ -86,57 +85,75 @@ router.post('/signin', function (req, res) {
     })
 });
 
-router.route('/movies')
-    .delete(authJwtController.isAuthenticated, function(req,res){
+router.route('/Movies')
+    .delete(authJwtController.isAuthenticated, function(req, res){
         if(!req.body.title){
-            res.json({success: false, message: "Error. No movie was found"});
-        }else{
-            Movies.findOneAndDelete(req.body.title, function(err,movie){
-                if (err) {
-                    res.send(err);
+            res.status(403).json({success:false, message: "Please provide a movie to be delete."});
+        }
+        else{
+            Movie.findOneAndDelete({title:req.body.title}, function(err, movie){
+                if (movie){
+                    res.status(200).json({success: true, message: "Found the movie!", Movie: movie});
                 }
-            });
+                else {
+                    res.status(404).json({success:false, message: "Movie was not found!"});
+                }
+            })
         }
     })
+    .put(authJwtController.isAuthenticated, function(req, res) {
+        if(!req.body.title|| !req.body.new_title){
+            res.status(403).json({SUCCESS:false, message: "Please provide a movie title to be updated along with the new title"})
+        }
+        else{
+            Movie.findOneAndUpdate({title:req.body.title}, {title :req.body.new_title}, function(err, movie){
+                if (movie) {
+                    res.status(200).json({success: true, message: "Found Movie"})
+                }
+                else {
+                    res.status(404).json({success: false, message: "Movie not found"});
+                }
+            })
+        }
+    })
+    .get(authJwtController.isAuthenticated,function(req, res) {
+           if(!req.body){
+               res.status(403).json({SUCCESS:false, message: "Please provide a movie to display"})
+           }
+           else{
+               Movie.find({title:req.body.title}).select("title year genre actorsName").exec(function(err, movie){
+                   if (movie) {
+                       res.status(200).json({success: true, message: "Success! The Movie was found", Movie: movie})
+                   }
+                   else {
+                       res.status(404).json({success: false, message: "Movie not found"});
+                   }
+               })
+           }
+    })
+    .post(authJwtController.isAuthenticated,function(req, res) {
+        if(!req.body.title || !req.body.year || !req.body.genre || !req.body.actorsName[0] || !req.body.actorsName[1] || !req.body.actorsName[2]) {
+                res.status(403).json({SUCCESS:false, message: "Error. Incorrect format "});
+            }
+            else{
+                var movie = new Movie();
+                movie.title = req.body.title;
+                movie.year = req.body.year;
+                movie.genre = req.body.genre;
+                movie.actorsName = req.body.actorsName;
 
-    .put(authJwtController.isAuthenticated, function(req,res){
-        if(!req.body.title || !req.body.newtitle){
-            res.json({success: false, message: "Error. No movie title was found"});
-        }else{
-            Movies.findOneAndUpdate(req.body.title, function(err,movie){
-                if (err) {
-                    res.send(err);
-                }
-            });
-        }
-    })
-
-    .post(authJwtController.isAuthenticated, function(req,res){
-        if(!req.body.title || !req.body.year || !req.body.genre ||req.body.actor){
-            res.json({success: false, message: "Error. No movie title was found"});
-        }else{
-            Movies.post(req.body.title, function(err,movie){
-                if (err) {
-                    res.send(err);
-                }
-            });
-        }
-    })
-
-    .get(authJwtController.isAuthenticated, function(req,res){
-        if(!req.body){
-            res.json({success: false, message: "Error. No movie title was found"});
-        }else{
-            Movies.find(req.body.title, function(err,movies){
-                if (err) {
-                    res.send(err);
-                }
-            });
-        }
-    })
+                movie.save(function(err){
+                    if (err){
+                        if(err.code === 11000)
+                            return res.json({SUCCESS:false, MESSAGE: "Error. Movie already exists"});
+                        else
+                            return res.json(err);
+                    }
+                })
+                res.json({SUCCESS:true, MESSAGE: "Movie Is Created."})
+            }
+        })
 
 app.use('/', router);
 app.listen(process.env.PORT || 8080);
 module.exports = app; // for testing only
-
-
