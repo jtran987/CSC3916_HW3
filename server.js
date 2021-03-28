@@ -12,6 +12,7 @@ var jwt = require('jsonwebtoken');
 var cors = require('cors');
 var User = require('./Users');
 var Movie =require('./Movies');
+var Reviews = require('./Review');
 
 var app = express();
 app.use(cors());
@@ -117,42 +118,97 @@ router.route('/Movies')
         }
     })
     .get(authJwtController.isAuthenticated,function(req, res) {
-           if(!req.body){
-               res.status(403).json({SUCCESS:false, message: "Please provide a movie to display"})
-           }
-           else{
-               Movie.find({title:req.body.title}).select("title year genre actorsName").exec(function(err, movie){
-                   if (movie) {
-                       res.status(200).json({success: true, message: "Success! The Movie was found", Movie: movie})
-                   }
-                   else {
-                       res.status(404).json({success: false, message: "Movie not found"});
-                   }
-               })
-           }
+        if(!req.body){
+            res.status(403).json({SUCCESS:false, message: "Please provide a movie to display"})
+        }
+        else{
+            Movie.find({title:req.body.title}).select("title year genre actorsName").exec(function(err, movie){
+                if (movie) {
+                    res.status(200).json({success: true, message: "Success! The Movie was found", Movie: movie})
+                }
+                else {
+                    res.status(404).json({success: false, message: "Movie not found"});
+                }
+            })
+        }
     })
     .post(authJwtController.isAuthenticated,function(req, res) {
         if(!req.body.title || !req.body.year || !req.body.genre || !req.body.actorsName[0] || !req.body.actorsName[1] || !req.body.actorsName[2]) {
-                res.status(403).json({SUCCESS:false, message: "Error. Incorrect format "});
-            }
-            else{
-                var movie = new Movie();
-                movie.title = req.body.title;
-                movie.year = req.body.year;
-                movie.genre = req.body.genre;
-                movie.actorsName = req.body.actorsName;
+            res.status(403).json({SUCCESS:false, message: "Error. Incorrect format "});
+        }
+        else{
+            var movie = new Movie();
+            movie.title = req.body.title;
+            movie.year = req.body.year;
+            movie.genre = req.body.genre;
+            movie.actorsName = req.body.actorsName;
 
-                movie.save(function(err){
-                    if (err){
-                        if(err.code === 11000)
-                            return res.json({SUCCESS:false, MESSAGE: "Error. Movie already exists"});
-                        else
+            movie.save(function(err){
+                if (err){
+                    if(err.code === 11000)
+                        return res.json({SUCCESS:false, MESSAGE: "Error. Movie already exists"});
+                    else
+                        return res.json(err);
+                }
+            })
+            res.json({SUCCESS:true, MESSAGE: "Movie Is Created."})
+        }
+    })
+
+router.route('/Review')
+    .get(function(req, res) {
+        if(!req.body.title){
+            res.json({SUCCESS:false, message: "Please provide a review to display"})
+        }
+        else if(req.query.Review === "true"){
+            Movie.findOne({title:req.body.title}, function(err, movie) {
+                if (err) {
+                    res.json({success: false, message: "Error! The review was not found"})
+                }
+                else{
+                    Movie.aggregate([{
+                        $match: {title: req.body.title}
+                    },
+                        {
+                            $lookup: {
+                                from: "reviews",
+                                localField: "title",
+                                foreignField: "title",
+                                as: "movieReview"
+                            }
+                        }]).exec(function (err, movie) {
+                        if (err) {
                             return res.json(err);
-                    }
-                })
-                res.json({SUCCESS:true, MESSAGE: "Movie Is Created."})
-            }
-        })
+                        } else {
+                            return res.json(movie);
+                        }
+                    })
+                }
+            })
+        }
+    })
+    .post(authJwtController.isAuthenticated,function(req, res) {
+        if(!req.body.title || !req.body.reviewName || !req.body.quote || !req.body.rating) {
+            res.status(403).json({SUCCESS:false, message: "Error. Incorrect format"});
+        }
+        else{
+            var review = new Reviews();
+            review.title = req.body.title;
+            review.reviewName = req.body.reviewName;
+            review.quote = req.body.quote;
+            review.rating = req.body.rating;
+
+            review.save(function(err){
+                if (err){
+                    if(err.code === 11000)
+                        return res.json({SUCCESS:false, MESSAGE: "Error. Review already exists"});
+                    else
+                        return res.json(err);
+                }
+            })
+            res.json({SUCCESS:true, MESSAGE: "Review Is Created."})
+        }
+    })
 
 app.use('/', router);
 app.listen(process.env.PORT || 8080);
